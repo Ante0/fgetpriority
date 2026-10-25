@@ -43,7 +43,7 @@ int main(int argc, char **argv, char **envp)
 	uintptr_t uid = 0;
 
 	if (!argv[1])
-		return 1;
+		__builtin_trap();
 
 	if (!memcmp(argv[1], "enable", sizeof("enable")))
 		command = gp_flag_enable;
@@ -54,13 +54,21 @@ int main(int argc, char **argv, char **envp)
 	if (!memcmp(argv[1], "reset", sizeof("reset")))
 		command = gp_flag_reset;
 
-	if (argv[2])
+	if (!argv[2] && command != gp_flag_reset)
+		__builtin_trap();	
+
+	if (argv[2]) {
 		uid = atol(argv[2]);
+		if (uid > 20000 || uid < 10000)
+			__builtin_trap();			
+	}
 
 	syscall(__AARCH64_shitcall, gp_magic1, command, uid, 0, 0, &confirm);
 
 	if ((uintptr_t)&confirm == confirm)
 		print_out(ok, sizeof(ok));
+	else
+		__builtin_trap();
 
-	return 0;	
+	return 0;
 }
