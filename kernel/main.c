@@ -21,16 +21,17 @@ static_assert(1 == 0, "ARM64 only!");
 
 #include "vmap_patch.h"
 
+// blank slot
 #define __AARCH64_shitcall	42
+
+static uintptr_t sct = 0x0;
+static uintptr_t blank_slot = 0x0;
 
 // magic commands
 #define gp_magic1		0x11111111	// arg0
 #define gp_flag_enable		0x1
 #define gp_flag_disable		0x2
 #define gp_flag_reset		0x3
-
-#define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
-static uintptr_t sct = 0x0;
 
 #ifdef TIF_SECCOMP
 #define is_seccomp_enabled() test_thread_flag(TIF_SECCOMP)
@@ -96,16 +97,29 @@ static int handle_shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 }
 #endif
 
-static void patch_sc42(void)
+static int patch_blank_slot(void)
 {
 	uintptr_t *table = (uintptr_t *)sct;
+	blank_slot = table[__AARCH64_shitcall];
+
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_shitcall], (uintptr_t)handle_shitcall);
-	pr_info("%s: ret: %d\n", __func__, ret);
+	pr_info("%s: slot: %d ret: %d\n", __func__, __AARCH64_shitcall, ret);
+	return ret;
 }
+
+static int restore_blank_slot(void)
+{
+	uintptr_t *table = (uintptr_t *)sct;
+	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_shitcall], blank_slot);
+	pr_info("%s: ret: %d\n", __func__, ret);
+	return ret;
+}
+
 
 #if 0
 static void print_sct(void)
 {
+#define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
 	uintptr_t *t = (uintptr_t *)sct;
 	uintptr_t last = 0x0;
 
@@ -122,7 +136,7 @@ module_param(sct_param, ulong, 0000);
 MODULE_PARM_DESC(sct_param, "sys_call_table symaddr");
 #endif
 
-static int __init lkm_template_init(void) 
+static int __init fgetpriority_init(void) 
 {
 	pr_info("init: Hello World!\n");
 
@@ -147,20 +161,45 @@ static int __init lkm_template_init(void)
 	pr_info("init: sys_call_table: 0x%lx \n", sct);
 #endif
 
-	patch_sc42();
-	getpriority_hook_init();
+	int ret = patch_blank_slot();
+	if (ret)
+		return ret;
+
+	ret = getpriority_hook_init();
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
-static void __exit lkm_template_exit(void) 
+static int lkm_unload(void *)
 {
-	__builtin_trap();
-	__builtin_unreachable();
-	pr_info("LKM: Goodbye\n");
+	int ret = getpriority_hook_exit();
+	if (ret)
+		return 0;
+
+	pr_info("exit: rc: %d \n", ret);
+	ret = restore_blank_slot();
+	if (ret)
+		return 0;
+
+	pr_info("exit: rc: %d \n", ret);
+	return 0;
 }
 
-module_init(lkm_template_init);
-module_exit(lkm_template_exit);
+static void __exit fgetpriority_exit(void)
+{
+#ifndef MODULE
+	__builtin_trap();
+	__builtin_unreachable();
+#endif
+
+//	stop_machine(lkm_unload_sm, NULL, NULL);
+	lkm_unload(nullptr);
+}
+
+module_init(fgetpriority_init);
+module_exit(fgetpriority_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("xx");

@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/thread_info.h>
+#include <linux/stop_machine.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>

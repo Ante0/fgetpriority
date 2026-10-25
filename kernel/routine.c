@@ -133,7 +133,7 @@ asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 }
 #endif	/* < 4.19 */
 
-static void getpriority_hook_init()
+static __init int getpriority_hook_init()
 {
 	static_assert(PAGE_SIZE > gp_alloc_size);
 
@@ -145,11 +145,25 @@ static void getpriority_hook_init()
 #ifdef MODULE
 	aarch64_getpriority = table[__AARCH64_getpriority];
 	if (!aarch64_getpriority)
-		return;
+		return -EBADSLT;
 #endif
 
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_getpriority], (uintptr_t)hook_aarch64_getpriority);
-	pr_info("write_to_readonly_slot: ret: %d \n", ret);
+	pr_info("%s: write_to_readonly_slot: ret: %d \n", __func__, ret);
+	return ret;
+}
 
+static int getpriority_hook_exit()
+{
+	uintptr_t *table = (uintptr_t *)sct;
+	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_getpriority], aarch64_getpriority);
+	pr_info("%s: write_to_readonly_slot: ret: %d \n", __func__, ret);
+	if (ret)
+		return -EBADSLT;	
+
+	gp_reset_bitmap(); // destroy bitmap
+	free_pages((uintptr_t)gp_package_bitmap, 0);
+	pr_info("%s: bitmap destroyed\n", __func__);
+	return ret;
 }
 
