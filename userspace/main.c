@@ -35,7 +35,7 @@ static void print_out(const char *buf, unsigned long len)
 
 #define memcmp __builtin_memcmp
 
-int main(int argc, char **argv, char **envp)
+static int main(int argc, char **argv, char **envp)
 {
 	const char ok[] = { 'o', 'k', '\n'};
 	uintptr_t confirm; // confirm receipt here
@@ -55,12 +55,12 @@ int main(int argc, char **argv, char **envp)
 		command = gp_flag_reset;
 
 	if (!argv[2] && command != gp_flag_reset)
-		__builtin_trap();	
+		__builtin_trap();
 
 	if (argv[2]) {
 		uid = atol(argv[2]);
 		if (uid > 20000 || uid < 10000)
-			__builtin_trap();			
+			__builtin_trap();
 	}
 
 	syscall(__AARCH64_shitcall, gp_magic1, command, uid, 0, 0, &confirm);
