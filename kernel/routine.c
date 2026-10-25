@@ -103,28 +103,32 @@ static __always_inline bool getpriority_should_swap(int which, int who)
 #define __AARCH64_getpriority 141
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-static syscall_fn_t aarch64_getpriority __read_mostly = nullptr;
-asmlinkage long hook_aarch64_getpriority(const struct pt_regs *regs)
+static uintptr_t aarch64_getpriority __read_mostly = 0x0;
+asmlinkage __nocfi long hook_aarch64_getpriority(const struct pt_regs *regs)
 {
-	extern typeof(hook_aarch64_getpriority) __arm64_sys_getpriority;
-
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
 	if (!!getpriority_should_swap(which, *p_who))
 		*p_who = 99999;
-
+#ifdef MODULE
+	return ((typeof(hook_aarch64_getpriority) *)aarch64_getpriority)(regs);
+#endif
+	extern typeof(hook_aarch64_getpriority) __arm64_sys_getpriority;
 	return __arm64_sys_getpriority(regs);
 }
 #else	/* < 4.19 */
-static void *aarch64_getpriority __read_mostly = nullptr;
-asmlinkage long hook_aarch64_getpriority(int which, int who)
+static uintptr_t aarch64_getpriority __read_mostly = 0x0;
+asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 {
 	int new_who = who;
 	
 	if (!!getpriority_should_swap(which, who))
 		new_who = 99999;
-
+#ifdef MODULE
+	return ((typeof(hook_aarch64_getpriority) *)aarch64_getpriority)(which, new_who);
+#endif
+	extern typeof(hook_aarch64_getpriority) __arm64_sys_getpriority;
 	return sys_getpriority(which, new_who);
 }
 #endif	/* < 4.19 */
@@ -137,6 +141,13 @@ static void getpriority_hook_init()
 	pr_info("page allocated at: 0x%lx, %u / %u bytes\n", (uintptr_t)gp_package_bitmap, gp_alloc_size, PAGE_SIZE);
 
 	uintptr_t *table = (uintptr_t *)sct;
+
+#ifdef MODULE
+	aarch64_getpriority = table[__AARCH64_getpriority];
+	if (!aarch64_getpriority)
+		return;
+#endif
+
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_getpriority], (uintptr_t)hook_aarch64_getpriority);
 	pr_info("write_to_readonly_slot: ret: %d \n", ret);
 

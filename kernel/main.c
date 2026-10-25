@@ -30,7 +30,7 @@ static_assert(1 == 0, "ARM64 only!");
 #define gp_flag_reset		0x3
 
 #define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
-uintptr_t sct = (uintptr_t)sys_call_table;
+static uintptr_t sct = 0x0;
 
 #ifdef TIF_SECCOMP
 #define is_seccomp_enabled() test_thread_flag(TIF_SECCOMP)
@@ -96,11 +96,11 @@ static int handle_shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 }
 #endif
 
-static void patch_sc18(void)
+static void patch_sc42(void)
 {
 	uintptr_t *table = (uintptr_t *)sct;
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_shitcall], (uintptr_t)handle_shitcall);
-	pr_info("patch_sc18: ret: %d\n", ret);
+	pr_info("%s: ret: %d\n", __func__, ret);
 }
 
 #if 0
@@ -116,13 +116,39 @@ static void print_sct(void)
 }
 #endif
 
+#ifdef MODULE
+static unsigned long sct_param = 0x0;
+module_param(sct_param, ulong, 0000);
+MODULE_PARM_DESC(sct_param, "sys_call_table symaddr");
+#endif
+
 static int __init lkm_template_init(void) 
 {
-	pr_info("LKM: Hello World!\n");
-	patch_sc18();
+	pr_info("init: Hello World!\n");
 
+#ifdef MODULE
+	sct = (uintptr_t)sct_param;
+	if (!sct)
+		return -EAGAIN;
+	kobject_del(&THIS_MODULE->mkobj.kobj);
+
+	char buf[KSYM_SYMBOL_LEN];
+	sprint_symbol_no_offset(buf, sct);
+
+	buf[KSYM_SYMBOL_LEN - 1] = 0;
+	char ksym[] = "sys_call_table";
+	if (!!strcmp(buf, ksym)) {
+		pr_info("init: wrong symbol!? %s found!\n", buf);
+		return -EAGAIN;
+	}
+	pr_info("init: %s: 0x%lx \n", buf, sct);
+#else
+	sct = (uintptr_t)sys_call_table;
+	pr_info("init: sys_call_table: 0x%lx \n", sct);
+#endif
+
+	patch_sc42();
 	getpriority_hook_init();
-
 	return 0;
 }
 
@@ -138,7 +164,7 @@ module_exit(lkm_template_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("xx");
-MODULE_DESCRIPTION("lkm hello");
+MODULE_DESCRIPTION("fgetpriority");
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
