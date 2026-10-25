@@ -1,0 +1,9 @@
+menu "UID Filter"
+
+config UID_FILTER
+	tristate "uid filter"
+	default y
+	help
+	  uid filter.
+
+endmenu
