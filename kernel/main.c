@@ -24,7 +24,8 @@ static_assert(1 == 0, "ARM64 only!");
 // blank slot
 #define __AARCH64_shitcall	42
 
-static uintptr_t sct = 0x0;
+static uintptr_t native_sct = 0x0;
+static uintptr_t compat_sct = 0x0;
 static uintptr_t blank_slot = 0x0;
 
 // magic commands
@@ -38,6 +39,8 @@ static uintptr_t blank_slot = 0x0;
 #else
 #define is_seccomp_enabled() (!!current->seccomp.mode)
 #endif
+
+static bool compat_hook_enabled = true;
 
 #include "routine.c"
 
@@ -99,7 +102,7 @@ static int handle_shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 
 static int patch_blank_slot(void)
 {
-	uintptr_t *table = (uintptr_t *)sct;
+	uintptr_t *table = (uintptr_t *)native_sct;
 	blank_slot = table[__AARCH64_shitcall];
 
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_shitcall], (uintptr_t)handle_shitcall);
@@ -109,7 +112,7 @@ static int patch_blank_slot(void)
 
 static int restore_blank_slot(void)
 {
-	uintptr_t *table = (uintptr_t *)sct;
+	uintptr_t *table = (uintptr_t *)native_sct;
 	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_shitcall], blank_slot);
 	pr_info("%s: ret: %d\n", __func__, ret);
 	return ret;
@@ -120,7 +123,7 @@ static int restore_blank_slot(void)
 static void print_sct(void)
 {
 #define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
-	uintptr_t *t = (uintptr_t *)sct;
+	uintptr_t *t = (uintptr_t *)native_sct;
 	uintptr_t last = 0x0;
 
 	for (unsigned int i = 0; i < ptr_per_page; i++) {
@@ -131,9 +134,13 @@ static void print_sct(void)
 #endif
 
 #ifdef MODULE
-static unsigned long sct_param = 0x0;
-module_param(sct_param, ulong, 0000);
-MODULE_PARM_DESC(sct_param, "sys_call_table symaddr");
+static unsigned long native_sct_param = 0x0;
+module_param(native_sct_param, ulong, 0000);
+MODULE_PARM_DESC(native_sct_param, "sys_call_table symaddr");
+
+static unsigned long compat_sct_param = 0x0;
+module_param(compat_sct_param, ulong, 0000);
+MODULE_PARM_DESC(compat_sct_param, "sys_call_table symaddr");
 #endif
 
 static int __init fgetpriority_init(void) 
@@ -141,26 +148,46 @@ static int __init fgetpriority_init(void)
 	pr_info("init: Hello World!\n");
 
 #ifdef MODULE
-	sct = (uintptr_t)sct_param;
-	if (!sct)
+	native_sct = (uintptr_t)native_sct_param;
+	if (!native_sct)
 		return -EAGAIN;
-	kobject_del(&THIS_MODULE->mkobj.kobj);
+
+	compat_sct = (uintptr_t)compat_sct_param;
+	if (!compat_sct) {
+		pr_info("init: compat_sys_call_table not supplied, will skip compat hooks\n");
+		compat_hook_enabled = false;
+	}
 
 	char buf[KSYM_SYMBOL_LEN];
-	sprint_symbol_no_offset(buf, sct);
-
-	buf[KSYM_SYMBOL_LEN - 1] = 0;
-	char ksym[] = "sys_call_table";
-	if (!!strcmp(buf, ksym)) {
+	sprint_symbol_no_offset(buf, native_sct);
+	char ksym_n[] = "sys_call_table";
+	if (!!strcmp(buf, ksym_n)) {
 		pr_info("init: wrong symbol!? %s found!\n", buf);
 		return -EAGAIN;
 	}
-	pr_info("init: %s: 0x%lx \n", buf, sct);
-#else
-	sct = (uintptr_t)sys_call_table;
-	pr_info("init: sys_call_table: 0x%lx \n", sct);
-#endif
+	pr_info("init: %s: 0x%lx \n", buf, native_sct);
 
+	if (compat_hook_enabled) {
+		sprint_symbol_no_offset(buf, compat_sct);
+		char ksym_c[] = "compat_sys_call_table";
+		if (!!strcmp(buf, ksym_c)) {
+			pr_info("init: wrong symbol!? %s found! will skip compat hooks!\n", buf);
+			compat_hook_enabled = false;
+		}
+		pr_info("init: %s: 0x%lx \n", buf, compat_sct);
+	}
+
+	kobject_del(&THIS_MODULE->mkobj.kobj);
+#else
+	native_sct = (uintptr_t)sys_call_table;
+	pr_info("init: sys_call_table: 0x%lx \n", native_sct);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+	extern const void *compat_sys_call_table[];
+#endif
+	compat_sct = (uintptr_t)compat_sys_call_table;
+	pr_info("init: compat_sys_call_table: 0x%lx \n", compat_sct);
+#endif
 	int ret = patch_blank_slot();
 	if (ret)
 		return ret;
@@ -169,6 +196,7 @@ static int __init fgetpriority_init(void)
 	if (ret)
 		return ret;
 
+	pr_info("init: done!\n");
 	return 0;
 }
 
