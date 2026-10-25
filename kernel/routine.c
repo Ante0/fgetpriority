@@ -103,7 +103,6 @@ static __always_inline bool getpriority_should_swap(int which, int who)
 #define __AARCH64_getpriority	141
 #define __AARCH64_ioprio_set	30
 #define __AARCH64_ioprio_get	31
-
 static uintptr_t aarch64_getpriority __read_mostly = 0x0;
 static uintptr_t aarch64_ioprio_get __read_mostly = 0x0;
 static uintptr_t aarch64_ioprio_set __read_mostly = 0x0;
@@ -188,7 +187,102 @@ asmlinkage __nocfi long hook_aarch64_ioprio_set(int which, int who, int ioprio)
 #endif	/* < 4.19 */
 
 #define patch_syscall_slot(storage, sys_nr, hook) ({					\
-	uintptr_t *table = (uintptr_t *)sct;						\
+	uintptr_t *table = (uintptr_t *)native_sct;						\
+	storage = table[sys_nr];							\
+	int ret = write_to_readonly_slot((uintptr_t)&table[sys_nr], (uintptr_t)hook);	\
+	pr_info("%s: patching %s: ret: %d \n", __func__, #sys_nr, ret);			\
+	ret;										\
+})
+
+// compat
+#define __ARMEABI_getpriority	96
+#define __ARMEABI_ioprio_set	314
+#define __ARMEABI_ioprio_get	315
+static uintptr_t armeabi_getpriority __read_mostly = 0x0;
+static uintptr_t armeabi_ioprio_get __read_mostly = 0x0;
+static uintptr_t armeabi_ioprio_set __read_mostly = 0x0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+asmlinkage __nocfi long hook_armeabi_getpriority(const struct pt_regs *regs)
+{
+	int which = regs->regs[0];
+	int *p_who = (int *)&regs->regs[1];
+
+	if (!!getpriority_should_swap(which, *p_who))
+		*p_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_getpriority) *)armeabi_getpriority)(regs);
+#endif
+	extern typeof(hook_armeabi_getpriority) __arm64_sys_getpriority;
+	return __arm64_sys_getpriority(regs);
+}
+asmlinkage __nocfi long hook_armeabi_ioprio_get(const struct pt_regs *regs)
+{
+	int which = regs->regs[0];
+	int *p_who = (int *)&regs->regs[1];
+
+	if (!!getpriority_should_swap(which, *p_who))
+		*p_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_ioprio_get) *)armeabi_ioprio_get)(regs);
+#endif
+	extern typeof(hook_armeabi_getpriority) __arm64_sys_ioprio_get;
+	return __arm64_sys_ioprio_get(regs);
+}
+asmlinkage __nocfi long hook_armeabi_ioprio_set(const struct pt_regs *regs)
+{
+	int which = regs->regs[0];
+	int *p_who = (int *)&regs->regs[1];
+
+	if (!!getpriority_should_swap(which, *p_who))
+		*p_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_ioprio_set) *)armeabi_ioprio_set)(regs);
+#endif
+	extern typeof(hook_armeabi_getpriority) __arm64_sys_ioprio_set;
+	return __arm64_sys_ioprio_set(regs);
+}
+
+#else	/* < 4.19 */
+
+asmlinkage __nocfi long hook_armeabi_getpriority(int which, int who)
+{
+	int new_who = who;
+	
+	if (!!getpriority_should_swap(which, who))
+		new_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_getpriority) *)armeabi_getpriority)(which, new_who);
+#endif
+	return sys_getpriority(which, new_who);
+}
+
+asmlinkage __nocfi long hook_armeabi_ioprio_get(int which, int who)
+{
+	int new_who = who;
+	
+	if (!!getpriority_should_swap(which, who))
+		new_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_ioprio_get) *)armeabi_ioprio_get)(which, new_who);
+#endif
+	return sys_ioprio_get(which, new_who);
+}
+
+asmlinkage __nocfi long hook_armeabi_ioprio_set(int which, int who, int ioprio)
+{
+	int new_who = who;
+	
+	if (!!getpriority_should_swap(which, who))
+		new_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_armeabi_ioprio_set) *)armeabi_ioprio_set)(which, new_who, ioprio);
+#endif
+	return sys_ioprio_set(which, new_who, ioprio);
+}
+#endif	/* < 4.19 */
+
+#define patch_syscall_slot_compat(storage, sys_nr, hook) ({				\
+	uintptr_t *table = (uintptr_t *)compat_sct;					\
 	storage = table[sys_nr];							\
 	int ret = write_to_readonly_slot((uintptr_t)&table[sys_nr], (uintptr_t)hook);	\
 	pr_info("%s: patching %s: ret: %d \n", __func__, #sys_nr, ret);			\
@@ -211,15 +305,33 @@ static __init int getpriority_hook_init()
 	if (!!patch_syscall_slot(aarch64_ioprio_get, __AARCH64_ioprio_get, hook_aarch64_ioprio_get))
 		return -EINTR;
 
+	if (!compat_hook_enabled)
+		return 0;
+
+	if (!!patch_syscall_slot_compat(armeabi_getpriority, __ARMEABI_getpriority, hook_armeabi_getpriority))
+		return -EINTR;
+
+	if (!!patch_syscall_slot_compat(armeabi_ioprio_set, __ARMEABI_ioprio_set, hook_armeabi_ioprio_set))
+		return -EINTR;
+
+	if (!!patch_syscall_slot_compat(armeabi_ioprio_get, __ARMEABI_ioprio_get, hook_armeabi_ioprio_get))
+		return -EINTR;
+
 	return 0;
 }
 
 static int getpriority_hook_exit()
 {
 	uintptr_t dummy;
-	patch_syscall_slot(dummy, __AARCH64_ioprio_get, hook_aarch64_ioprio_get);
-	patch_syscall_slot(dummy, __AARCH64_ioprio_set, hook_aarch64_ioprio_set);
+	patch_syscall_slot(dummy, __AARCH64_ioprio_get, aarch64_ioprio_get);
+	patch_syscall_slot(dummy, __AARCH64_ioprio_set, aarch64_ioprio_set);
 	patch_syscall_slot(dummy, __AARCH64_getpriority, aarch64_getpriority);
+
+	if (compat_hook_enabled) {
+		patch_syscall_slot(dummy, __ARMEABI_ioprio_get, armeabi_ioprio_get);
+		patch_syscall_slot(dummy, __ARMEABI_ioprio_set, armeabi_ioprio_set);
+		patch_syscall_slot(dummy, __ARMEABI_getpriority, armeabi_getpriority);
+	}
 
 	gp_reset_bitmap(); // destroy bitmap
 	free_pages((uintptr_t)gp_package_bitmap, 0);
