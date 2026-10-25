@@ -1,4 +1,4 @@
-obj-$(CONFIG_UID_FILTER) += fgetpriority.o
+obj-$(CONFIG_FGETPRIORITY) += fgetpriority.o
 fgetpriority-y := main.o
 
 ccflags-y +=  $(call cc-option, -std=gnu11)

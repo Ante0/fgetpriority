@@ -53,8 +53,7 @@ static inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uint
 	if (likely(!!current_uid().val))
 		return;
 
-	pr_info("shitcall: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n",  arg0, arg1, arg2, arg3, arg4, arg5);
-
+//	pr_info("shitcall: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n",  arg0, arg1, arg2, arg3, arg4, arg5);
 	if (arg0 != gp_magic1)
 		return;
 
@@ -74,7 +73,8 @@ static inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uint
 	}
 
 	// confirm transmission to user
-	!!copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t));
+	if (!!copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t)))
+		return;
 }
 
 // syscall wrapper and legacy
@@ -167,27 +167,36 @@ static int __init fgetpriority_init(void)
 	}
 	pr_info("init: %s: 0x%lx \n", buf, native_sct);
 
-	if (compat_hook_enabled) {
-		sprint_symbol_no_offset(buf, compat_sct);
-		char ksym_c[] = "compat_sys_call_table";
-		if (!!strcmp(buf, ksym_c)) {
-			pr_info("init: wrong symbol!? %s found! will skip compat hooks!\n", buf);
-			compat_hook_enabled = false;
-		}
-		pr_info("init: %s: 0x%lx \n", buf, compat_sct);
-	}
+	if (!compat_hook_enabled)
+		goto skip_compat;
 
+	sprint_symbol_no_offset(buf, compat_sct);
+	char ksym_c[] = "compat_sys_call_table";
+	if (!!strcmp(buf, ksym_c)) {
+		pr_info("init: wrong symbol!? %s found! will skip compat hooks!\n", buf);
+		compat_hook_enabled = false;
+	}
+	pr_info("init: %s: 0x%lx \n", buf, compat_sct);
+
+skip_compat:
 	kobject_del(&THIS_MODULE->mkobj.kobj);
-#else
+
+#else /* ! MODULE */
 	native_sct = (uintptr_t)sys_call_table;
 	pr_info("init: sys_call_table: 0x%lx \n", native_sct);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#ifdef CONFIG_COMPAT
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
 	extern const void *compat_sys_call_table[];
-#endif
+	#endif
 	compat_sct = (uintptr_t)compat_sys_call_table;
 	pr_info("init: compat_sys_call_table: 0x%lx \n", compat_sct);
-#endif
+#else
+	compat_hook_enabled = false;
+	pr_info("init: compat_sys_call_table will be skipped!\n");
+#endif // CONFIG_COMPAT
+
+#endif /* ! MODULE */
 	int ret = patch_blank_slot();
 	if (ret)
 		return ret;

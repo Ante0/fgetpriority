@@ -1,6 +1,6 @@
-menu "UID Filter"
+menu "fgetpriority"
 
-config UID_FILTER
+config FGETPRIORITY
 	tristate "uid filter"
 	default m
 	help

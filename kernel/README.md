@@ -1,6 +1,6 @@
 ### fgetpriority
 
-A small LKM to filter sys_getpriority / sys_ioprio_get / sys_ioprio_set
+A small LKM to filter sys_getpriority / sys_setpriority / sys_ioprio_get / sys_ioprio_set
 
 Usage (if LKM):
 
