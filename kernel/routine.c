@@ -100,10 +100,15 @@ static __always_inline bool getpriority_should_swap(int which, int who)
 	return true;
 }
 
-#define __AARCH64_getpriority 141
+#define __AARCH64_getpriority	141
+#define __AARCH64_ioprio_set	30
+#define __AARCH64_ioprio_get	31
+
+static uintptr_t aarch64_getpriority __read_mostly = 0x0;
+static uintptr_t aarch64_ioprio_get __read_mostly = 0x0;
+static uintptr_t aarch64_ioprio_set __read_mostly = 0x0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-static uintptr_t aarch64_getpriority __read_mostly = 0x0;
 asmlinkage __nocfi long hook_aarch64_getpriority(const struct pt_regs *regs)
 {
 	int which = regs->regs[0];
@@ -117,8 +122,34 @@ asmlinkage __nocfi long hook_aarch64_getpriority(const struct pt_regs *regs)
 	extern typeof(hook_aarch64_getpriority) __arm64_sys_getpriority;
 	return __arm64_sys_getpriority(regs);
 }
+asmlinkage __nocfi long hook_aarch64_ioprio_get(const struct pt_regs *regs)
+{
+	int which = regs->regs[0];
+	int *p_who = (int *)&regs->regs[1];
+
+	if (!!getpriority_should_swap(which, *p_who))
+		*p_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_aarch64_ioprio_get) *)aarch64_ioprio_get)(regs);
+#endif
+	extern typeof(hook_aarch64_getpriority) __arm64_sys_ioprio_get;
+	return __arm64_sys_ioprio_get(regs);
+}
+asmlinkage __nocfi long hook_aarch64_ioprio_set(const struct pt_regs *regs)
+{
+	int which = regs->regs[0];
+	int *p_who = (int *)&regs->regs[1];
+
+	if (!!getpriority_should_swap(which, *p_who))
+		*p_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_aarch64_ioprio_set) *)aarch64_ioprio_set)(regs);
+#endif
+	extern typeof(hook_aarch64_getpriority) __arm64_sys_ioprio_set;
+	return __arm64_sys_ioprio_set(regs);
+}
+
 #else	/* < 4.19 */
-static uintptr_t aarch64_getpriority __read_mostly = 0x0;
 asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 {
 	int new_who = who;
@@ -128,10 +159,41 @@ asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 #ifdef MODULE
 	return ((typeof(hook_aarch64_getpriority) *)aarch64_getpriority)(which, new_who);
 #endif
-	extern typeof(hook_aarch64_getpriority) __arm64_sys_getpriority;
 	return sys_getpriority(which, new_who);
 }
+
+asmlinkage __nocfi long hook_aarch64_ioprio_get(int which, int who)
+{
+	int new_who = who;
+	
+	if (!!getpriority_should_swap(which, who))
+		new_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_aarch64_ioprio_get) *)aarch64_ioprio_get)(which, new_who);
+#endif
+	return sys_ioprio_get(which, new_who);
+}
+
+asmlinkage __nocfi long hook_aarch64_ioprio_set(int which, int who, int ioprio)
+{
+	int new_who = who;
+	
+	if (!!getpriority_should_swap(which, who))
+		new_who = 99999;
+#ifdef MODULE
+	return ((typeof(hook_aarch64_ioprio_set) *)aarch64_ioprio_set)(which, new_who, ioprio);
+#endif
+	return sys_ioprio_set(which, new_who, ioprio);
+}
 #endif	/* < 4.19 */
+
+#define patch_syscall_slot(storage, sys_nr, hook) ({					\
+	uintptr_t *table = (uintptr_t *)sct;						\
+	storage = table[sys_nr];							\
+	int ret = write_to_readonly_slot((uintptr_t)&table[sys_nr], (uintptr_t)hook);	\
+	pr_info("%s: patching %s: ret: %d \n", __func__, #sys_nr, ret);			\
+	ret;										\
+})
 
 static __init int getpriority_hook_init()
 {
@@ -140,30 +202,28 @@ static __init int getpriority_hook_init()
 	gp_package_bitmap = (uint8_t *)get_zeroed_page(GFP_KERNEL | __GFP_NOFAIL);
 	pr_info("page allocated at: 0x%lx, %u / %u bytes\n", (uintptr_t)gp_package_bitmap, gp_alloc_size, PAGE_SIZE);
 
-	uintptr_t *table = (uintptr_t *)sct;
+	if (!!patch_syscall_slot(aarch64_getpriority, __AARCH64_getpriority, hook_aarch64_getpriority))
+		return -EINTR;
 
-#ifdef MODULE
-	aarch64_getpriority = table[__AARCH64_getpriority];
-	if (!aarch64_getpriority)
-		return -EBADSLT;
-#endif
+	if (!!patch_syscall_slot(aarch64_ioprio_set, __AARCH64_ioprio_set, hook_aarch64_ioprio_set))
+		return -EINTR;
 
-	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_getpriority], (uintptr_t)hook_aarch64_getpriority);
-	pr_info("%s: write_to_readonly_slot: ret: %d \n", __func__, ret);
-	return ret;
+	if (!!patch_syscall_slot(aarch64_ioprio_get, __AARCH64_ioprio_get, hook_aarch64_ioprio_get))
+		return -EINTR;
+
+	return 0;
 }
 
 static int getpriority_hook_exit()
 {
-	uintptr_t *table = (uintptr_t *)sct;
-	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_getpriority], aarch64_getpriority);
-	pr_info("%s: write_to_readonly_slot: ret: %d \n", __func__, ret);
-	if (ret)
-		return -EBADSLT;	
+	uintptr_t dummy;
+	patch_syscall_slot(dummy, __AARCH64_ioprio_get, hook_aarch64_ioprio_get);
+	patch_syscall_slot(dummy, __AARCH64_ioprio_set, hook_aarch64_ioprio_set);
+	patch_syscall_slot(dummy, __AARCH64_getpriority, aarch64_getpriority);
 
 	gp_reset_bitmap(); // destroy bitmap
 	free_pages((uintptr_t)gp_package_bitmap, 0);
 	pr_info("%s: bitmap destroyed\n", __func__);
-	return ret;
+	return 0;
 }
 

@@ -2,7 +2,7 @@ menu "UID Filter"
 
 config UID_FILTER
 	tristate "uid filter"
-	default y
+	default m
 	help
 	  uid filter.
 
