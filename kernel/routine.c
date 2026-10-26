@@ -272,9 +272,10 @@ asmlinkage __nocfi long hook_armeabi_setpriority(const struct pt_regs *regs)
 
 	if (!!getpriority_should_swap(which, *p_who))
 		*p_who = 99999;
-#ifdef MODULE
-	return ((typeof(hook_armeabi_setpriority) *)armeabi_setpriority)(regs);
-#endif
+
+	if (is_module)
+		return ((typeof(hook_armeabi_setpriority) *)armeabi_setpriority)(regs);
+
 	extern typeof(hook_armeabi_setpriority) __arm64_sys_setpriority;
 	return __arm64_sys_setpriority(regs);
 }
