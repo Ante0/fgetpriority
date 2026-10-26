@@ -65,7 +65,7 @@ static void gp_reset_bitmap(void)
 	kick_all_cpus_sync();
 }
 
-static __always_inline bool getpriority_should_swap(int which, int who)
+static __always_inline bool getpriority_should_swap(int which, int who, const bool is_io)
 {
 	if (unlikely(!is_seccomp_enabled()))
 		return false;
@@ -79,7 +79,10 @@ static __always_inline bool getpriority_should_swap(int which, int who)
 	__builtin_prefetch(gp_package_bitmap);
 	barrier();
 
-	if (which != 2)
+	if (!is_io && which != PRIO_USER)
+		return false;
+
+	if (is_io && which != IOPRIO_WHO_USER)
 		return false;
 
 	if (cuid == who)
@@ -126,7 +129,7 @@ asmlinkage __nocfi long hook_aarch64_setpriority(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		*p_who = 99999;
 
 	if (is_module)
@@ -141,7 +144,7 @@ asmlinkage __nocfi long hook_aarch64_getpriority(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		*p_who = 99999;
 
 	if (is_module)
@@ -155,7 +158,7 @@ asmlinkage __nocfi long hook_aarch64_ioprio_get(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		*p_who = 99999;
 
 	if (is_module)
@@ -170,7 +173,7 @@ asmlinkage __nocfi long hook_aarch64_ioprio_set(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		*p_who = 99999;
 
 	if (is_module)
@@ -184,7 +187,7 @@ asmlinkage __nocfi long hook_aarch64_ioprio_set(const struct pt_regs *regs)
 asmlinkage __nocfi long hook_aarch64_setpriority(int which, int who, int niceval)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		new_who = 99999;
 
 	if (is_module)
@@ -196,7 +199,7 @@ asmlinkage __nocfi long hook_aarch64_setpriority(int which, int who, int niceval
 asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		new_who = 99999;
 
 	if (is_module)
@@ -208,7 +211,7 @@ asmlinkage __nocfi long hook_aarch64_getpriority(int which, int who)
 asmlinkage __nocfi long hook_aarch64_ioprio_get(int which, int who)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		new_who = 99999;
 
 	if (is_module)
@@ -220,7 +223,7 @@ asmlinkage __nocfi long hook_aarch64_ioprio_get(int which, int who)
 asmlinkage __nocfi long hook_aarch64_ioprio_set(int which, int who, int ioprio)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		new_who = 99999;
 
 	if (is_module)
@@ -255,7 +258,7 @@ asmlinkage __nocfi long hook_armeabi_getpriority(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		*p_who = 99999;
 
 	if (is_module)
@@ -270,7 +273,7 @@ asmlinkage __nocfi long hook_armeabi_setpriority(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, false))
 		*p_who = 99999;
 
 	if (is_module)
@@ -285,7 +288,7 @@ asmlinkage __nocfi long hook_armeabi_ioprio_get(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		*p_who = 99999;
 
 	if (is_module)
@@ -300,7 +303,7 @@ asmlinkage __nocfi long hook_armeabi_ioprio_set(const struct pt_regs *regs)
 	int which = regs->regs[0];
 	int *p_who = (int *)&regs->regs[1];
 
-	if (!!getpriority_should_swap(which, *p_who))
+	if (!!getpriority_should_swap(which, *p_who, true))
 		*p_who = 99999;
 
 	if (is_module)
@@ -315,7 +318,7 @@ asmlinkage __nocfi long hook_armeabi_ioprio_set(const struct pt_regs *regs)
 asmlinkage __nocfi long hook_armeabi_getpriority(int which, int who)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, who, false))
 		new_who = 99999;
 	if (is_module)
 		return ((typeof(hook_armeabi_getpriority) *)armeabi_getpriority)(which, new_who);
@@ -326,7 +329,7 @@ asmlinkage __nocfi long hook_armeabi_getpriority(int which, int who)
 asmlinkage __nocfi long hook_armeabi_setpriority(int which, int who, int niceval)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, who, false))
 		new_who = 99999;
 
 	if (is_module)
@@ -338,7 +341,7 @@ asmlinkage __nocfi long hook_armeabi_setpriority(int which, int who, int niceval
 asmlinkage __nocfi long hook_armeabi_ioprio_get(int which, int who)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, who, true))
 		new_who = 99999;
 
 	if (is_module)
@@ -350,7 +353,7 @@ asmlinkage __nocfi long hook_armeabi_ioprio_get(int which, int who)
 asmlinkage __nocfi long hook_armeabi_ioprio_set(int which, int who, int ioprio)
 {
 	int new_who = who;
-	if (!!getpriority_should_swap(which, who))
+	if (!!getpriority_should_swap(which, who, true))
 		new_who = 99999;
 
 	if (is_module)
