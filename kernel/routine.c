@@ -77,7 +77,6 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 
 	// try to equalize memory load to all
 	__builtin_prefetch(gp_package_bitmap);
-	barrier();
 
 	if (!is_io && which != PRIO_USER)
 		return false;
