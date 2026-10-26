@@ -199,11 +199,11 @@ skip_compat:
 #endif /* ! MODULE */
 	int ret = patch_blank_slot();
 	if (ret)
-		return ret;
+		panic("patching failed: %d\n", ret);
 
 	ret = getpriority_hook_init();
 	if (ret)
-		return ret;
+		panic("patching failed: %d\n", ret);
 
 	pr_info("init: done!\n");
 	return 0;
