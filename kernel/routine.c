@@ -18,10 +18,11 @@ static uint8_t *gp_package_bitmap __read_mostly = nullptr;
 #define gp_alloc_size	((gp_bitmap_bits + 7) / 8)
 
 static_assert(sizeof(*gp_package_bitmap) == 1);
+static_assert(PAGE_SIZE > gp_alloc_size);
 
 static __always_inline bool gp_test_package_bit(int uid)
 {
-	assume_dereferenceable(gp_package_bitmap, gp_alloc_size);
+	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
 	if (uid > 20000 || uid < 10000)
 		return false;
 
@@ -36,7 +37,7 @@ static __always_inline bool gp_test_package_bit(int uid)
 
 static void gp_set_package_bit(int uid, bool enable)
 {
-	assume_dereferenceable(gp_package_bitmap, gp_alloc_size);
+	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
 	if (uid > 20000)
 		return;
 
@@ -59,7 +60,7 @@ static void gp_set_package_bit(int uid, bool enable)
 
 static void gp_reset_bitmap(void)
 {
-	assume_dereferenceable(gp_package_bitmap, gp_alloc_size);
+	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
 	memset_explicit(gp_package_bitmap, 0, gp_alloc_size);
 	pr_info("%s: bitmap reset \n", __func__);
 	kick_all_cpus_sync();
@@ -373,8 +374,6 @@ asmlinkage __nocfi long hook_armeabi_ioprio_set(int which, int who, int ioprio)
 
 static __init int getpriority_hook_init()
 {
-	static_assert(PAGE_SIZE > gp_alloc_size);
-
 	gp_package_bitmap = (uint8_t *)get_zeroed_page(GFP_KERNEL | __GFP_NOFAIL);
 	pr_info("page allocated at: 0x%lx, %u / %lu bytes\n", (uintptr_t)gp_package_bitmap, gp_alloc_size, PAGE_SIZE);
 
