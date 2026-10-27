@@ -117,20 +117,13 @@ static int restore_blank_slot(void)
 	return ret;
 }
 
-
-#if 0
 static void print_sct(void)
 {
 #define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
 	uintptr_t *t = (uintptr_t *)native_sct;
-	uintptr_t last = 0x0;
-
-	for (unsigned int i = 0; i < ptr_per_page; i++) {
-		last = t[i];
-		pr_info("sys_call_table: entry: %u: 0x%lx\n", i, last);
-	}
+	for (unsigned int i = 0; i < ptr_per_page; i++)
+		pr_info("sys_call_table: entry: %u: 0x%lx\n", i, t[i]);
 }
-#endif
 
 #ifdef MODULE
 static unsigned long native_sct_param = 0x0;
@@ -196,6 +189,10 @@ skip_compat:
 #endif // CONFIG_COMPAT
 
 #endif /* ! MODULE */
+
+// debug, print sct
+//	print_sct();
+
 	int ret = patch_blank_slot();
 	if (ret)
 		panic("patching failed: %d\n", ret);
