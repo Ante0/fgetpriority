@@ -366,7 +366,7 @@ asmlinkage __nocfi long hook_armeabi_ioprio_set(int which, int who, int ioprio)
 	ret;										\
 })
 
-static __init int getpriority_hook_init()
+static __init int getpriority_hook_init(void)
 {
 	gp_package_bitmap = (uint8_t *)get_zeroed_page(GFP_KERNEL | __GFP_NOFAIL);
 	pr_info("page allocated at: 0x%lx, %u / %lu bytes\n", (uintptr_t)gp_package_bitmap, gp_alloc_size, PAGE_SIZE);
@@ -402,7 +402,7 @@ static __init int getpriority_hook_init()
 	return 0;
 }
 
-static int getpriority_hook_exit()
+static int getpriority_hook_exit(void)
 {
 	patch_syscall_slot(dummy, __AARCH64_ioprio_get, aarch64_ioprio_get);
 	patch_syscall_slot(dummy, __AARCH64_ioprio_set, aarch64_ioprio_set);
