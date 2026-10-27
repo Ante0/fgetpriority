@@ -103,12 +103,6 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 	return true;
 }
 
-#ifdef MODULE
-#define is_module true
-#else
-#define is_module false
-#endif
-
 // dummy
 static uintptr_t dummy = 0x0;
 
