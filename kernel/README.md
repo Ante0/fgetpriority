@@ -23,5 +23,3 @@ Compatibility:
 
 Usage (if built-in):
 - just compile it in :^)
-
-

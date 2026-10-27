@@ -17,4 +17,3 @@ example, to filter all pkg uid:
 for i in $(awk '$2 >= 10000 {print $2}' /data/system/packages.list | sort -n); do /tmp/binary enable $i; done
 
 ```
-

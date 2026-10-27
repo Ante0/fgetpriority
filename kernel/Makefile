@@ -49,4 +49,3 @@ CFLAGS_REMOVE_main.o += -enable-trivial-auto-var-init-zero-knowing-it-will-be-re
 # if cflags can be macro'd, this will be called 'TRUST_ME'
 CFLAGS_main.o += -fno-stack-protector -fno-stack-check
 CFLAGS_REMOVE_main.o += -fsanitize=shadow-call-stack
-

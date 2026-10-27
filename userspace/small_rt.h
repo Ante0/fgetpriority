@@ -11,7 +11,7 @@
 __attribute__((always_inline, noipa))
 static long __syscall_raw(long n, long a, long b, long c, long d, long e, long f)
 {
-	register long 
+	register long
 		x8 asm("x8") = n,
 		x0 asm("x0") = a,
 		x1 asm("x1") = b,
@@ -61,7 +61,7 @@ static long __syscall_raw(long n, long a, long b, long c, long d, long e, long f
 		"syscall"
 		: "=a"(ret)
 		: "a"(n), "D"(a), "S"(b), "d"(c), "r"(d), "r"(e), "r"(f)
-		: "rcx", "r11", 
+		: "rcx", "r11",
 		"memory");
 
 	return ret;
@@ -163,7 +163,7 @@ void __start(void) {
 }
 
 #elif defined(__x86_64__)
-__attribute__((naked, section(".text.start"))) 
+__attribute__((naked, section(".text.start")))
 void __start(void) {
 	asm volatile(
 		"mov %rsp, %rdi\n"
@@ -171,7 +171,7 @@ void __start(void) {
 	);
 }
 #elif defined(__i386__)
-__attribute__((naked, section(".text.start"))) 
+__attribute__((naked, section(".text.start")))
 void __start(void) {
 	asm volatile(
 		"movl %esp, %eax\n"
@@ -180,4 +180,3 @@ void __start(void) {
 	);
 }
 #endif
-

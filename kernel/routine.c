@@ -76,6 +76,20 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 	if (unlikely(cuid < 10000))
 		return false;
 
+	// convert all isolated processes to appuids
+	if (likely(cuid >= 90000))
+	{
+		struct user_namespace *ns = current_cred()->user_ns;
+		if (ns && ns != &init_user_ns)
+		{
+			kuid_t host_kuid = make_kuid(ns, 0);
+			if (uid_valid(host_kuid))
+			{
+				cuid = from_kuid(&init_user_ns, host_kuid);
+			}
+		}
+	}
+
 	// try to equalize memory load to all
 	__builtin_prefetch(gp_package_bitmap);
 
@@ -98,7 +112,7 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 
 	if (!gp_test_package_bit(who))
 		return true;
-		
+
 //	pr_info("getpriority: uid: %d is set! \n", who);
 	return false;
 }
@@ -106,7 +120,7 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 // dummy
 static uintptr_t dummy = 0x0;
 
-// native 
+// native
 #define __AARCH64_setpriority	140
 #define __AARCH64_getpriority	141
 #define __AARCH64_ioprio_set	30
@@ -421,4 +435,3 @@ static int getpriority_hook_exit(void)
 	pr_info("%s: bitmap destroyed\n", __func__);
 	return 0;
 }
-

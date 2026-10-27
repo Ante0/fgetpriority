@@ -201,7 +201,7 @@ typedef typeof(nullptr) nullptr_t;
  *
  * from: OPENSSL_cleanse, volatile function pointer prevents memset optimization
  * https://github.com/openssl/openssl/blob/master/crypto/mem_clr.c
- * 
+ *
  */
 static __nocfi __always_inline void *memset_explicit(void *s, int c, size_t count)
 {
@@ -211,7 +211,7 @@ static __nocfi __always_inline void *memset_explicit(void *s, int c, size_t coun
 
 /**
  * C2y's countof
- * 
+ *
  * - this is literally like kernel's ARRAY_SIZE
  */
 #if __has_feature(c_countof) || __has_extension(c_countof)
@@ -278,7 +278,7 @@ typedef unsigned __int128 uint128_t;
 
 /**
  * __attribute__((__cleanup__(fn)))
- * - pseudo-raii / defer / scoped cleanup on C 
+ * - pseudo-raii / defer / scoped cleanup on C
  *
  * NOTE: passes address of variable attributed to fn()
  */
@@ -307,4 +307,3 @@ static inline void kfree_byref(void *buf) { kfree(*(void **)buf); }
 #define __offstack_flags(size, flags)	__scoped_kmalloc(size, flags)
 #define __offstack(size)		__scoped_kmalloc(size, GFP_KERNEL | __GFP_NOFAIL)
 #define __zoffstack(size)		__scoped_kmalloc(size, GFP_KERNEL | __GFP_NOFAIL | __GFP_ZERO)
-
