@@ -111,10 +111,10 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 //	pr_info("ksu_getpriority: caller: %d paramms: %d / %d comm: %s \n", current_uid().val, which, who, current->comm);
 
 	if (!gp_test_package_bit(who))
-		return true;
+		return false;
 
 //	pr_info("getpriority: uid: %d is set! \n", who);
-	return false;
+	return true;
 }
 
 // dummy
