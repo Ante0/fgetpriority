@@ -20,6 +20,8 @@ static uint8_t *gp_package_bitmap __read_mostly = nullptr;
 #define MIN_APP_PROCESS_UID      10000
 #define MIN_ISOLATED_PROCESS_UID 90000
 
+static const int AID_USER_OFFSET = 100000;
+
 static_assert(sizeof(*gp_package_bitmap) == 1);
 static_assert(PAGE_SIZE > gp_alloc_size);
 
@@ -92,6 +94,12 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 			}
 		}
 	}
+
+	if (unlikely(cuid >= AID_USER_OFFSET))
+		cuid %= AID_USER_OFFSET;
+
+	if (unlikely(who >= AID_USER_OFFSET))
+	    who %= AID_USER_OFFSET;
 
 	if (likely(cuid == who))
 		return false;
