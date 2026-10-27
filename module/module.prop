@@ -2,5 +2,5 @@ id=fgetpriority
 name=fgetpriority
 version=v0.0.1
 versionCode=1
-author=backslashxx and frknkrc44
+author=xx, frknkrc44
 description=A kernel module that works as companion of HMA-OSS Zygisk.
