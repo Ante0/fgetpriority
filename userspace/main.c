@@ -2,7 +2,6 @@
 #include "small_rt.h"
 #define syscall __syscall
 
-#define gp_confirm		"fgetpriority"
 #define gp_magic1		0x11111111	// arg0
 #define gp_flag_enable		0x1
 #define gp_flag_disable		0x2
@@ -37,8 +36,8 @@ static void print_out(const char *buf, unsigned long len)
 static int main(int argc, char **argv, char **envp)
 {
 	const char ok[] = { 'o', 'k', '\n'};
+	uintptr_t confirm; // confirm receipt here
 	uintptr_t command;
-	char confirm[sizeof(gp_confirm)]; // confirm receipt here
 	uintptr_t uid = 0;
 
 	if (!argv[1])
@@ -64,7 +63,7 @@ static int main(int argc, char **argv, char **envp)
 
 	syscall(SYS_acct, gp_magic1, command, uid, 0, 0, &confirm);
 
-	if (!memcmp(confirm, gp_confirm, sizeof(confirm)))
+	if ((uintptr_t)&confirm == confirm)
 		print_out(ok, sizeof(ok));
 	else
 		__builtin_trap();
