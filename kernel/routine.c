@@ -17,6 +17,9 @@ static uint8_t *gp_package_bitmap __read_mostly = nullptr;
 #define gp_bitmap_bits	10000
 #define gp_alloc_size	((gp_bitmap_bits + 7) / 8)
 
+#define MIN_APP_PROCESS_UID      10000
+#define MIN_ISOLATED_PROCESS_UID 90000
+
 static_assert(sizeof(*gp_package_bitmap) == 1);
 static_assert(PAGE_SIZE > gp_alloc_size);
 
@@ -73,11 +76,11 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 
 	// only filter appuid calls
 	int cuid = current_uid().val;
-	if (unlikely(cuid < 10000))
+	if (unlikely(cuid < MIN_APP_PROCESS_UID || who < MIN_APP_PROCESS_UID))
 		return false;
 
 	// convert all isolated processes to appuids
-	if (likely(cuid >= 90000))
+	if (unlikely(cuid >= MIN_ISOLATED_PROCESS_UID))
 	{
 		struct user_namespace *ns = current_cred()->user_ns;
 		if (ns && ns != &init_user_ns)
@@ -90,6 +93,9 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 		}
 	}
 
+	if (likely(cuid == who))
+		return false;
+
 	// try to equalize memory load to all
 	__builtin_prefetch(gp_package_bitmap);
 
@@ -97,12 +103,6 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 		return false;
 
 	if (is_io && which != IOPRIO_WHO_USER)
-		return false;
-
-	if (cuid == who)
-		return false;
-
-	if (who < 10000)
 		return false;
 
 	if (who >= 20000)
