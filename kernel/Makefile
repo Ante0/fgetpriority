@@ -3,19 +3,35 @@
 obj-$(CONFIG_FGETPRIORITY) += fgetpriority.o
 fgetpriority-y := main.o
 
-CFLAGS_main.o +=  $(call cc-option, -std=gnu11)
-CFLAGS_main.o +=  $(call cc-option, -std=gnu17)
-CFLAGS_main.o +=  $(call cc-option, -std=gnu23)
-CFLAGS_main.o +=  $(call cc-option, -std=gnu2y)
+# CFLAGS_main.o += -Weverything
+# CFLAGS_main.o += $(call cc-option, -Wno-unsafe-buffer-usage)
 
+# warnings are warnings.
+CFLAGS_REMOVE_main.o += -Werror
+
+CFLAGS_main.o += -Wall
 CFLAGS_main.o += $(call cc-option, -Wno-declaration-after-statement)
 CFLAGS_main.o += $(call cc-option, -Wno-deprecated-octal-literals)
+CFLAGS_main.o += $(call cc-option, -Wno-int-to-pointer-cast)
+CFLAGS_main.o += $(call cc-option, -Wno-pointer-to-int-cast)
+CFLAGS_main.o += $(call cc-option, -Wno-int-conversion)
+CFLAGS_main.o += $(call cc-option, -Wno-unused-variable)
+CFLAGS_main.o += $(call cc-option, -Wno-unused-function)
+CFLAGS_main.o += $(call cc-option, -Wno-format)
+
+# enforce atleast gnu11
+CFLAGS_main.o += $(call cc-option, -std=gnu11)
+CFLAGS_main.o += $(call cc-option, -std=gnu17)
+CFLAGS_main.o += $(call cc-option, -std=gnu23)
+CFLAGS_main.o += $(call cc-option, -std=gnu2y)
 
 ifeq ($(CONFIG_CC_OPTIMIZE_FOR_SIZE),y)
 CFLAGS_REMOVE_main.o += -Oz
 CFLAGS_REMOVE_main.o += -Os
 CFLAGS_main.o += -O2
 endif
+
+CFLAGS_main.o += $(call cc-option, -Wframe-larger-than=256)
 
 CFLAGS_REMOVE_main.o += -fno-builtin
 

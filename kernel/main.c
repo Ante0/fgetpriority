@@ -19,14 +19,8 @@ static_assert(1 == 0, "ARM64 only!");
 #define pr_fmt(fmt) "fgetpriority: " fmt
 #endif
 
-#include "vmap_patch.h"
-
 // blank slot
 #define __AARCH64_shitcall	42
-
-static uintptr_t native_sct = 0x0;
-static uintptr_t compat_sct = 0x0;
-static uintptr_t blank_slot = 0x0;
 
 // magic commands
 #define gp_magic1		0x11111111	// arg0
@@ -40,12 +34,16 @@ static uintptr_t blank_slot = 0x0;
 #define is_seccomp_enabled() (!!current->seccomp.mode)
 #endif
 
+static uintptr_t native_sct = 0x0;
+static uintptr_t compat_sct = 0x0;
+static uintptr_t blank_slot = 0x0;
 static bool compat_hook_enabled = true;
 
+#include "vmap_patch.h"
 #include "routine.c"
 
 // common handler
-static inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
+static __always_inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
 {
 	if (likely(is_seccomp_enabled()))
 		return;
@@ -73,8 +71,9 @@ static inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uint
 	}
 
 	// confirm transmission to user
-	if (!!copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t)))
-		return;
+	int ret = copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t));
+	if (ret)
+		pr_info("copy_to_user ret: %d \n", ret);
 }
 
 // syscall wrapper and legacy
@@ -230,7 +229,6 @@ static void __exit fgetpriority_exit(void)
 	__builtin_trap();
 	__builtin_unreachable();
 #endif
-
 //	stop_machine(lkm_unload_sm, NULL, NULL);
 	lkm_unload(nullptr);
 }
