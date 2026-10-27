@@ -20,6 +20,9 @@ static uint8_t *gp_package_bitmap __read_mostly = nullptr;
 static_assert(sizeof(*gp_package_bitmap) == 1);
 static_assert(PAGE_SIZE > gp_alloc_size);
 
+#define ENABLE_ULTIMATUM
+
+#ifndef ENABLE_ULTIMATUM
 static __always_inline bool gp_test_package_bit(int uid)
 {
 	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
@@ -65,6 +68,11 @@ static void gp_reset_bitmap(void)
 	pr_info("%s: bitmap reset \n", __func__);
 	kick_all_cpus_sync();
 }
+#else
+#define gp_test_package_bit(...)	({ true; })
+#define gp_set_package_bit(...)		do { } while (0)
+#define gp_reset_bitmap()		do { } while (0)
+#endif
 
 static __always_inline bool getpriority_should_swap(int which, int who, const bool is_io)
 {
