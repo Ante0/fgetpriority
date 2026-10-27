@@ -78,8 +78,11 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 
 	// only filter appuid calls
 	int cuid = current_uid().val;
-	if (unlikely(cuid < MIN_APP_PROCESS_UID || who < MIN_APP_PROCESS_UID))
+	if (unlikely(cuid < MIN_APP_PROCESS_UID))
 		return false;
+
+	if (unlikely(cuid >= AID_USER_OFFSET))
+		cuid %= AID_USER_OFFSET;
 
 	// convert all isolated processes to appuids
 	if (unlikely(cuid >= MIN_ISOLATED_PROCESS_UID))
@@ -89,23 +92,21 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 		{
 			kuid_t host_kuid = make_kuid(ns, 0);
 			if (uid_valid(host_kuid))
-			{
 				cuid = from_kuid(&init_user_ns, host_kuid);
-			}
 		}
 	}
 
-	if (unlikely(cuid >= AID_USER_OFFSET))
-		cuid %= AID_USER_OFFSET;
+	// try to equalize memory load to all
+	__builtin_prefetch(gp_package_bitmap);
+
+	if (unlikely(who < MIN_APP_PROCESS_UID))
+		return false;
 
 	if (unlikely(who >= AID_USER_OFFSET))
 	    who %= AID_USER_OFFSET;
 
 	if (likely(cuid == who))
 		return false;
-
-	// try to equalize memory load to all
-	__builtin_prefetch(gp_package_bitmap);
 
 	if (!is_io && which != PRIO_USER)
 		return false;
