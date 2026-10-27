@@ -2,8 +2,6 @@
 #include "small_rt.h"
 #define syscall __syscall
 
-#define __AARCH64_shitcall	42
-
 #define gp_magic1		0x11111111	// arg0
 #define gp_flag_enable		0x1
 #define gp_flag_disable		0x2
@@ -63,7 +61,7 @@ static int main(int argc, char **argv, char **envp)
 			__builtin_trap();
 	}
 
-	syscall(__AARCH64_shitcall, gp_magic1, command, uid, 0, 0, &confirm);
+	syscall(SYS_acct, gp_magic1, command, uid, 0, 0, &confirm);
 
 	if ((uintptr_t)&confirm == confirm)
 		print_out(ok, sizeof(ok));
