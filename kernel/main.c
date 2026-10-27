@@ -221,7 +221,7 @@ skip_compat:
 	return 0;
 }
 
-static int lkm_unload(void *)
+static int lkm_unload(void *unused)
 {
 	int ret = restore_sys_acct_slot();
 	if (ret)

@@ -18,6 +18,7 @@ CFLAGS_main.o += $(call cc-option, -Wno-int-conversion)
 CFLAGS_main.o += $(call cc-option, -Wno-unused-variable)
 CFLAGS_main.o += $(call cc-option, -Wno-unused-function)
 CFLAGS_main.o += $(call cc-option, -Wno-format)
+CFLAGS_main.o += $(call cc-option, -Wno-c2x-extensions)
 
 # enforce atleast gnu11
 CFLAGS_main.o += $(call cc-option, -std=gnu11)
@@ -31,7 +32,7 @@ CFLAGS_REMOVE_main.o += -Os
 CFLAGS_main.o += -O2
 endif
 
-CFLAGS_main.o += $(call cc-option, -Wframe-larger-than=256)
+CFLAGS_main.o += $(call cc-option, -Wframe-larger-than=1024)
 
 CFLAGS_REMOVE_main.o += -fno-builtin
 
