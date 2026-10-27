@@ -39,5 +39,8 @@ do
 done
 
 cd $MODULE_DIR
-rm -f fgetpriority.zip
-zip -r fgetpriority.zip *
+
+VERSION=$(grep version= module.prop | cut -f2 -d=)
+
+rm -f fgetpriority*.zip
+zip -r fgetpriority_$VERSION.zip *
