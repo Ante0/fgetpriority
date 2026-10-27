@@ -22,6 +22,7 @@ static_assert(1 == 0, "ARM64 only!");
 #define __AARCH64_sys_acct	89
 
 // magic commands
+#define gp_confirm		"fgetpriority"
 #define gp_magic1		0x11111111	// arg0
 #define gp_flag_enable		0x1
 #define gp_flag_disable		0x2
@@ -76,8 +77,8 @@ static __always_inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t a
 		break;
 	}
 
-	// confirm transmission to user
-	int ret = copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t));
+	const char str[] = gp_confirm;
+	int ret = copy_to_user((void __user *)arg5, &str, sizeof(str));
 	if (ret)
 		pr_info("copy_to_user ret: %d \n", ret);
 }
