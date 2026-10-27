@@ -34,6 +34,10 @@ kmi_from_uname() {
 }
 
 KMI="$(kmi_from_uname)"
+if [ -z "$KMI" ] && command -v ksud >/dev/null; then
+    KMI=$(ksud boot-info current-kmi 2>/dev/null)
+fi
+
 SRC=""
 [ -n "$KMI" ] && [ -f "$MODPATH/ko/${KMI}_arm64_fgetpriority.ko" ] && SRC="$MODPATH/ko/${KMI}_arm64_fgetpriority.ko"
 
