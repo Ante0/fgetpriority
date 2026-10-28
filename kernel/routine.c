@@ -20,7 +20,7 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 
 	// only filter appuid calls
 	int cuid = current_uid().val;
-	if (unlikely(cuid < MIN_APP_PROCESS_UID))
+	if (unlikely(cuid < MIN_APP_PROCESS_UID || who < MIN_APP_PROCESS_UID))
 		return false;
 
 	if (unlikely(cuid >= AID_USER_OFFSET))
@@ -38,8 +38,16 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 		}
 	}
 
-	if (unlikely(who < MIN_APP_PROCESS_UID))
-		return false;
+	if (unlikely(who >= MIN_ISOLATED_PROCESS_UID))
+	{
+		struct user_namespace *ns = current_cred()->user_ns;
+		if (ns && ns != &init_user_ns)
+		{
+			kuid_t host_kuid = make_kuid(ns, 0);
+			if (uid_valid(host_kuid))
+				who = from_kuid(&init_user_ns, host_kuid);
+		}
+	}
 
 	if (unlikely(who >= AID_USER_OFFSET))
 	    who %= AID_USER_OFFSET;
