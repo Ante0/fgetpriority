@@ -8,68 +8,10 @@
  *
  */
 
-// an array of 8 bits
-static uint8_t *gp_package_bitmap __read_mostly = nullptr;
-
-// we want 10000 bits
-// app uid = 10000, means bit 0
-// app uid = 10001, means bit 1
-#define gp_bitmap_bits	10000
-#define gp_alloc_size	((gp_bitmap_bits + 7) / 8)
-
 #define MIN_APP_PROCESS_UID      10000
 #define MIN_ISOLATED_PROCESS_UID 90000
 
 static const int AID_USER_OFFSET = 100000;
-
-static_assert(sizeof(*gp_package_bitmap) == 1);
-static_assert(PAGE_SIZE > gp_alloc_size);
-
-static __always_inline bool gp_test_package_bit(int uid)
-{
-	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
-	if (uid > 20000 || uid < 10000)
-		return false;
-
-	int uid_offset = uid - 10000;
-
-	int byte_idx = uid_offset / 8;
-	int bit_idx = uid_offset % 8;
-
-	// see if bit is set, go to index, & mask to teh array
-	return !!(gp_package_bitmap[byte_idx] & (1 << bit_idx));
-}
-
-static void gp_set_package_bit(int uid, bool enable)
-{
-	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
-	if (uid > 20000)
-		return;
-
-	if (uid < 10000)
-		return;
-
-	int uid_offset = uid - 10000;
-
-	int byte_idx = uid_offset / 8;
-	int bit_idx  = uid_offset % 8;
-	if (enable) {
-		gp_package_bitmap[byte_idx] |= (1U << bit_idx);
-		pr_info("%s: %d is set!\n", __func__, uid);
-	} else {
-		gp_package_bitmap[byte_idx] &= ~(1U << bit_idx);
-		pr_info("%s: %d is cleared!\n", __func__, uid);
-	}
-	kick_all_cpus_sync();
-}
-
-static void gp_reset_bitmap(void)
-{
-	assume_dereferenceable(gp_package_bitmap, PAGE_SIZE);
-	memset_explicit(gp_package_bitmap, 0, gp_alloc_size);
-	pr_info("%s: bitmap reset \n", __func__);
-	kick_all_cpus_sync();
-}
 
 static __always_inline bool getpriority_should_swap(int which, int who, const bool is_io)
 {
@@ -96,9 +38,6 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 		}
 	}
 
-	// try to equalize memory load to all
-	__builtin_prefetch(gp_package_bitmap);
-
 	if (unlikely(who < MIN_APP_PROCESS_UID))
 		return false;
 
@@ -114,16 +53,10 @@ static __always_inline bool getpriority_should_swap(int which, int who, const bo
 	if (is_io && which != IOPRIO_WHO_USER)
 		return false;
 
-	if (who >= 20000)
-		return false;
-
 //	pr_info("ksu_getpriority: caller: %d paramms: %d / %d comm: %s \n", current_uid().val, which, who, current->comm);
 
-	if (!gp_test_package_bit(who))
-		return true;
-
 //	pr_info("getpriority: uid: %d is set! \n", who);
-	return false;
+	return true;
 }
 
 // dummy
@@ -391,10 +324,6 @@ asmlinkage __nocfi long hook_armeabi_ioprio_set(int which, int who, int ioprio)
 
 static __init int getpriority_hook_init(void)
 {
-	gp_package_bitmap = (uint8_t *)get_zeroed_page(GFP_KERNEL | __GFP_NOFAIL);
-	pr_info("page allocated at: 0x%lx, %u / %lu bytes\n", (uintptr_t)gp_package_bitmap, gp_alloc_size, PAGE_SIZE);
-
-
 	if (!!patch_syscall_slot(aarch64_setpriority, __AARCH64_setpriority, hook_aarch64_setpriority))
 		return -EINTR;
 
@@ -439,8 +368,5 @@ static int getpriority_hook_exit(void)
 		patch_syscall_slot_compat(dummy, __ARMEABI_setpriority, armeabi_setpriority);
 	}
 
-	gp_reset_bitmap(); // destroy bitmap
-	free_pages((uintptr_t)gp_package_bitmap, 0);
-	pr_info("%s: bitmap destroyed\n", __func__);
 	return 0;
 }

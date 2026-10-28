@@ -19,14 +19,6 @@ static_assert(1 == 0, "ARM64 only!");
 #define pr_fmt(fmt) "fgetpriority: " fmt
 #endif
 
-#define __AARCH64_sys_acct	89
-
-// magic commands
-#define gp_magic1		0x11111111	// arg0
-#define gp_flag_enable		0x1
-#define gp_flag_disable		0x2
-#define gp_flag_reset		0x3
-
 #ifdef TIF_SECCOMP
 #define is_seccomp_enabled() test_thread_flag(TIF_SECCOMP)
 #else
@@ -47,99 +39,6 @@ static bool compat_hook_enabled = true;
 
 #include "vmap_patch.h"
 #include "routine.c"
-
-// common handler
-static __always_inline void shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
-{
-	int cuid = current_uid().val;
-
-	// only allow root and uid 1000
-	if (likely(cuid != 1000 && cuid != 0))
-		return;
-
-//	pr_info("shitcall: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n",  arg0, arg1, arg2, arg3, arg4, arg5);
-	if (likely(arg0 != gp_magic1))
-		return;
-
-	switch (arg1) {
-	case gp_flag_enable:
-		gp_set_package_bit((int)arg2, true);
-		break;
-	case gp_flag_disable:
-		gp_set_package_bit((int)arg2, false);
-		break;
-	case gp_flag_reset:
-		gp_reset_bitmap();
-		break;
-	default:
-		pr_info("wrong input\n");
-		break;
-	}
-
-	// confirm transmission to user
-	int ret = copy_to_user((void __user *)arg5, &arg5, sizeof(uintptr_t));
-	if (ret)
-		pr_info("copy_to_user ret: %d \n", ret);
-}
-
-// syscall wrapper and legacy
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-__attribute__((used))
-static long handle_shitcall(const struct pt_regs *regs)
-{
-	uintptr_t arg0 = (uintptr_t)regs->regs[0];
-	uintptr_t arg1 = (uintptr_t)regs->regs[1];
-	uintptr_t arg2 = (uintptr_t)regs->regs[2];
-	uintptr_t arg3 = (uintptr_t)regs->regs[3];
-	uintptr_t arg4 = (uintptr_t)regs->regs[4];
-	uintptr_t arg5 = (uintptr_t)regs->regs[5];
-	shitcall(arg0, arg1, arg2, arg3, arg4, arg5);
-
-	if (is_module)
-		return ((typeof(handle_shitcall) *)aarch64_acct)(regs);
-
-	extern typeof(handle_shitcall) __arm64_sys_acct;
-	return __arm64_sys_acct(regs);
-}
-#else
-__attribute__((used))
-static long handle_shitcall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
-{
-	shitcall(arg0, arg1, arg2, arg3, arg4, arg5);
-
-	if (is_module)
-		return ((typeof(sys_acct) *)aarch64_acct)((const char __user *)arg0);
-
-	return sys_acct((const char __user *)arg0);
-}
-#endif
-
-static int patch_sys_acct(void)
-{
-	uintptr_t *table = (uintptr_t *)native_sct;
-
-	aarch64_acct = table[__AARCH64_sys_acct];
-
-	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_sys_acct], (uintptr_t)handle_shitcall);
-	pr_info("%s: slot: %d ret: %d\n", __func__, __AARCH64_sys_acct, ret);
-	return ret;
-}
-
-static int restore_sys_acct_slot(void)
-{
-	uintptr_t *table = (uintptr_t *)native_sct;
-	int ret = write_to_readonly_slot((uintptr_t)&table[__AARCH64_sys_acct], aarch64_acct);
-	pr_info("%s: ret: %d\n", __func__, ret);
-	return ret;
-}
-
-static void print_sct(void)
-{
-#define ptr_per_page (PAGE_SIZE / sizeof(uintptr_t))
-	uintptr_t *t = (uintptr_t *)native_sct;
-	for (unsigned int i = 0; i < ptr_per_page; i++)
-		pr_info("sys_call_table: entry: %u: 0x%lx\n", i, t[i]);
-}
 
 #ifdef MODULE
 static unsigned long native_sct_param = 0x0;
@@ -212,11 +111,7 @@ skip_compat:;
 // debug, print sct
 //	print_sct();
 
-	int ret = patch_sys_acct();
-	if (ret)
-		panic("patching failed: %d\n", ret);
-
-	ret = getpriority_hook_init();
+	int ret = getpriority_hook_init();
 	if (ret)
 		panic("patching failed: %d\n", ret);
 
@@ -226,11 +121,7 @@ skip_compat:;
 
 static int lkm_unload(void *unused)
 {
-	int ret = restore_sys_acct_slot();
-	if (ret)
-		panic("patching failed: %d\n", ret);
-
-	ret = getpriority_hook_exit();
+	int ret = getpriority_hook_exit();
 	if (ret)
 		panic("patching failed: %d\n", ret);
 
