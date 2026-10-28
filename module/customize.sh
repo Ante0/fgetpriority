@@ -3,6 +3,9 @@ SKIPUNZIP=0
 
 # This file is adapted from the uidfake project
 
+export MODULE_HOT_INSTALL_REQUEST="true"
+export MODULE_HOT_RUN_SCRIPT="service.sh"
+
 ui_print "- Installing the LKM driver"
 
 # 6.1.138-android14-11-g0c3559bcd85-ab14529892 -> android14-6.1
