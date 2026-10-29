@@ -22,9 +22,6 @@ CFLAGS_main.o += $(call cc-option, -Wno-c2x-extensions)
 
 # enforce atleast gnu11
 CFLAGS_main.o += $(call cc-option, -std=gnu11)
-CFLAGS_main.o += $(call cc-option, -std=gnu17)
-CFLAGS_main.o += $(call cc-option, -std=gnu23)
-CFLAGS_main.o += $(call cc-option, -std=gnu2y)
 
 ifeq ($(CONFIG_CC_OPTIMIZE_FOR_SIZE),y)
 CFLAGS_REMOVE_main.o += -Oz
