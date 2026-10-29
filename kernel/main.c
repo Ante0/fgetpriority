@@ -40,7 +40,7 @@ static bool compat_hook_enabled = true;
 #include "vmap_patch.h"
 #include "routine.c"
 
-#ifdef MODULE
+#ifdef CONFIG_MODULE
 static unsigned long native_sct_param = 0x0;
 module_param(native_sct_param, ulong, 0000);
 MODULE_PARM_DESC(native_sct_param, "sys_call_table symaddr");
@@ -56,7 +56,7 @@ static int __init fgetpriority_init(void)
 {
 	pr_info("init: Hello World!\n");
 
-#ifdef MODULE
+#ifdef CONFIG_MODULE
 	native_sct = (uintptr_t)native_sct_param;
 	if (!native_sct)
 		return -EAGAIN;
@@ -131,7 +131,7 @@ static int lkm_unload(void *unused)
 
 static void __exit fgetpriority_exit(void)
 {
-#ifndef MODULE
+#ifndef CONFIG_MODULE
 	__builtin_trap();
 	__builtin_unreachable();
 #else
