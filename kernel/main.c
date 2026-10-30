@@ -31,7 +31,7 @@ static uintptr_t aarch64_acct = 0x0;
 
 static bool compat_hook_enabled = true;
 
-#ifdef MODULE
+#ifdef CONFIG_MODULE
 #define is_module true
 #else
 #define is_module false
