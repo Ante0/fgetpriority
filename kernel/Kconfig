@@ -2,7 +2,7 @@ menu "fgetpriority"
 
 config FGETPRIORITY
 	tristate "uid filter"
-	default y
+	default m
 	help
 	  uid filter.
 
